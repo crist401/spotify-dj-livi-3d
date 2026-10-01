@@ -63,7 +63,25 @@ El firmware [`esp32_firmware.ino`](file:///C:/Users/crist/.gemini/antigravity-id
 
 ---
 
+## 🌐 Despliegue en GitHub Pages (Entrega en Canvas)
+
+Para activar la visualización web pública y compartir el enlace en Canvas:
+
+1. **Crear repositorio en GitHub**: Sube este proyecto a tu cuenta de GitHub en un repositorio público (ej. `spotify-dj-livi-3d`).
+2. **Activar GitHub Pages**:
+   - Ve a **Settings** > **Pages** en tu repositorio.
+   - En **Build and deployment** > **Branch**, selecciona `main` y la carpeta `/(root)`.
+   - Haz clic en **Save**.
+3. **Obtener el enlace**:
+   - Tu proyecto estará disponible en: `https://<tu-usuario>.github.io/<tu-repositorio>/`
+4. **Entrega en Canvas**:
+   - Pega el enlace de GitHub Pages en la tarea de Canvas para que el profesor pueda interactuar con el modelo 3D en vivo directamente desde su navegador.
+
+---
+
 ## ▶️ Ejecución Local
 
-Abre en tu navegador:
-👉 **[http://localhost:8080/](http://localhost:8080/)**
+Si deseas probar localmente antes de subir:
+1. Ejecuta `./server.ps1` en PowerShell.
+2. Abre en tu navegador: **[http://localhost:8080/](http://localhost:8080/)**
+
