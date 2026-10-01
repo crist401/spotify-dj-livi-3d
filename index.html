@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotify DJ Livi - Dispositivo 3D ESP32</title>
+  <meta name="description" content="Simulador 3D completo en Three.js para dispositivo físico ESP32 con DJ Livi de Spotify, perilla de volumen, pantalla OLED y 3 botones.">
+
+  <!-- Google Fonts & Iconos -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(15, 18, 24, 0.85);
+      --border: rgba(255, 255, 255, 0.08);
+      --spotify: #1db954;
+      --spotify-glow: rgba(29, 185, 84, 0.4);
+      --cyan: #00d2ff;
+      --purple: #9d4edd;
+      --text: #f0f2f5;
+      --text-muted: #8c9ba5;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+    }
+
+    /* UI Layout */
+    .ui-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: grid;
+      grid-template-columns: 320px 1fr 340px;
+      grid-template-rows: auto 1fr auto;
+      gap: 16px;
+      padding: 20px;
+    }
+    .ui-overlay > * { pointer-events: auto; }
+
+    .glass {
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 16px 32px rgba(0,0,0,0.6);
+    }
+
+    /* Header */
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand i {
+      font-size: 28px;
+      color: var(--spotify);
+      filter: drop-shadow(0 0 10px var(--spotify-glow));
+    }
+    .brand h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .brand h1 span {
+      color: var(--spotify);
+      font-size: 13px;
+      background: rgba(29, 185, 84, 0.15);
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-left: 6px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .btn-usb {
+      background: linear-gradient(135deg, var(--spotify), #00d2ff);
+      color: #000;
+      border: none;
+      font-weight: 700;
+      padding: 8px 18px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn-usb:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px var(--spotify-glow);
+    }
+
+    /* Left Panel */
+    .left-panel {
+      grid-column: 1;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .card {
+      padding: 16px;
+    }
+    .card-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 6px;
+    }
+    .card-title i { color: var(--spotify); }
+
+    .file-drop {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.2s;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .file-drop:hover {
+      border-color: var(--spotify);
+      background: rgba(29, 185, 84, 0.08);
+    }
+    .file-drop i { font-size: 24px; color: var(--spotify); margin-bottom: 6px; }
+    .file-drop p { font-size: 11px; color: var(--text-muted); }
+
+    .control-guide {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 12px;
+    }
+    .control-guide li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .badge {
+      background: var(--spotify);
+      color: #000;
+      font-weight: 800;
+      font-size: 11px;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .control-guide strong { color: #fff; display: block; font-size: 12px; margin-bottom: 2px; }
+    .control-guide p { color: var(--text-muted); font-size: 11px; line-height: 1.35; }
+
+    /* Right Panel (Spotify Player HUD & ESP32 Status) */
+    .right-panel {
+      grid-column: 3;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .track-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .track-art {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #1db954, #00d2ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #000;
+      flex-shrink: 0;
+    }
+    .track-meta h4 { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px; }
+    .track-meta p { font-size: 11px; color: var(--text-muted); }
+
+    .hud-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin: 10px 0;
+    }
+    .ctrl-btn {
+      background: rgba(255,255,255,0.08);
+      border: none;
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.2s;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.1); }
+    .ctrl-btn.play {
+      width: 42px;
+      height: 42px;
+      background: var(--spotify);
+      color: #000;
+      font-size: 16px;
+    }
+
+    .vol-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .vol-row input {
+      flex: 1;
+      accent-color: var(--spotify);
+      cursor: pointer;
+    }
+
+    .esp-monitor {
+      background: #040508;
+      border: 1px solid rgba(0, 210, 255, 0.2);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: #a0c4ff;
+      max-height: 90px;
+      overflow-y: auto;
+    }
+
+    /* Bottom Status */
+    footer {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 18px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #666; margin-right: 6px;
+    }
+    .status-dot.on { background: #00ff66; box-shadow: 0 0 8px #00ff66; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .ui-overlay { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; overflow-y: auto; }
+      .left-panel, .right-panel { grid-column: 1; }
+    }
+  </style>
+
+  <!-- Import Three.js y Addons (ESM) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- Canvas 3D -->
+  <div id="canvas-container"></div>
+
+  <!-- UI Overlay -->
+  <div class="ui-overlay">
+    <!-- Header -->
+    <header class="glass">
+      <div class="brand">
+        <i class="fa-brands fa-spotify"></i>
+        <h1>DJ LIVI <span>ESP32 Smart Device 3D</span></h1>
+      </div>
+      <div class="header-actions">
+        <button id="btn-connect-esp32" class="btn-usb">
+          <i class="fa-brands fa-usb"></i> Conectar ESP32 Real
+        </button>
+      </div>
+    </header>
+
+    <!-- Panel Izquierdo: Blender & Controles -->
+    <div class="left-panel">
+      <!-- Cargar Blender -->
+      <div class="glass card">
+        <div class="card-title"><i class="fa-solid fa-cube"></i> Modelo de Blender (.glb)</div>
+        <div class="file-drop" id="drop-zone">
+          <input type="file" id="glb-file-input" accept=".glb,.gltf" style="display: none;">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <p>Arrastra tu archivo <b>.glb</b> aquí o haz clic para seleccionarlo.</p>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+          <button id="btn-load-certamen" class="btn-usb" style="flex: 1; justify-content: center; font-size: 11px; padding: 7px 8px; background: rgba(29, 185, 84, 0.25); color: #fff; border: 1px solid var(--spotify);">
+            <i class="fa-solid fa-cube"></i> Modelo Certamen
+          </button>
+          <button id="btn-load-procedural" class="btn-usb" style="flex: 1; justify-content: center; font-size: 11px; padding: 7px 8px; background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid var(--border);">
+            <i class="fa-solid fa-shapes"></i> Procedural
+          </button>
+        </div>
+      </div>
+
+      <!-- Guía de Botones -->
+      <div class="glass card">
+        <div class="card-title"><i class="fa-solid fa-hand-pointer"></i> Los 3 Botones Físicos</div>
+        <ul class="control-guide">
+          <li>
+            <span class="badge">1</span>
+            <div>
+              <strong>Botón 1 (Power ON/OFF)</strong>
+              <p>Clic para encender/apagar la pantalla OLED y la ESP32.</p>
+            </div>
+          </li>
+          <li>
+            <span class="badge">2</span>
+            <div>
+              <strong>Botón 2 (Perilla Giratoria de Volumen)</strong>
+              <p><b>Girar a la Derecha:</b> Subir volumen (+).<br><b>Girar a la Izquierda:</b> Bajar volumen (-).<br><i>Arrastra con el ratón o usa la rueda.</i></p>
+            </div>
+          </li>
+          <li>
+            <span class="badge">3</span>
+            <div>
+              <strong>Botón 3 (Play / Pausa Música)</strong>
+              <p>Clic para reproducir/pausar la música y activar el ecualizador.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Panel Derecho: Reproductor & Monitor ESP32 -->
+    <div class="right-panel">
+      <div class="glass card">
+        <div class="card-title"><i class="fa-brands fa-spotify"></i> Reproductor Spotify DJ Livi</div>
+        <div class="track-row">
+          <div class="track-art"><i class="fa-solid fa-music"></i></div>
+          <div class="track-meta">
+            <h4 id="hud-track-title">Livi's Chill Beats</h4>
+            <p id="hud-track-artist">Spotify AI DJ • ESP32 Edition</p>
+          </div>
+        </div>
+
+        <div class="hud-controls">
+          <button id="hud-btn-prev" class="ctrl-btn"><i class="fa-solid fa-backward-step"></i></button>
+          <button id="hud-btn-play" class="ctrl-btn play"><i class="fa-solid fa-play"></i></button>
+          <button id="hud-btn-next" class="ctrl-btn"><i class="fa-solid fa-forward-step"></i></button>
+          <button id="hud-btn-voice" class="ctrl-btn" title="Hablar con DJ Livi"><i class="fa-solid fa-comment-dots"></i></button>
+        </div>
+
+        <div class="vol-row">
+          <i class="fa-solid fa-volume-low"></i>
+          <input type="range" id="hud-vol-slider" min="0" max="100" value="70">
+          <i class="fa-solid fa-volume-high"></i>
+          <span id="hud-vol-text">70%</span>
+        </div>
+      </div>
+
+      <!-- Monitor Serial ESP32 -->
+      <div class="glass card">
+        <div class="card-title"><i class="fa-solid fa-microchip"></i> ESP32 Hardware Log</div>
+        <div id="esp-terminal" class="esp-monitor">
+          <div>[SYSTEM] Three.js Listo.</div>
+          <div>[ESP32] Esperando Botón 1 de Encendido...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="glass">
+      <div><span id="status-dot" class="status-dot"></span><span id="status-label">Dispositivo: APAGADO</span></div>
+      <div id="status-vol">Volumen: 70% (Ángulo: 54°)</div>
+      <div>Microcontrolador: ESP32-WROOM-32 | 115200 baud</div>
+    </footer>
+  </div>
+
+  <!-- Canvas Oculto para la Textura Dinámica de la Pantalla OLED -->
+  <canvas id="screen-canvas" width="512" height="256" style="display: none;"></canvas>
+
+  <!-- LÓGICA PRINCIPAL JAVASCRIPT -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // -----------------------------------------------------------------
+    // 1. MOTOR DE AUDIO (Web Audio API Synthesizer & DJ Livi Voice TTS)
+    // -----------------------------------------------------------------
+    class AudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.analyser = null;
+        this.isPlaying = false;
+        this.volume = 0.7;
+        this.timer = null;
+        this.step = 0;
+      }
+      init() {
+        if (this.ctx) return;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContextClass();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = 64;
+        this.masterGain.connect(this.analyser);
+        this.analyser.connect(this.ctx.destination);
+      }
+      setVolume(val) {
+        this.volume = Math.max(0, Math.min(1, val));
+        if (this.masterGain && this.ctx) {
+          this.masterGain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.05);
+        }
+      }
+      getFrequencies() {
+        if (!this.analyser) return new Uint8Array(32).fill(0);
+        const data = new Uint8Array(this.analyser.frequencyBinCount);
+        this.analyser.getByteFrequencyData(data);
+        return data;
+      }
+      playClick(type = 'click') {
+        this.init();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        if (type === 'on') {
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+        } else if (type === 'off') {
+          osc.frequency.setValueAtTime(660, now);
+          osc.frequency.exponentialRampToValueAtTime(220, now + 0.15);
+        } else {
+          osc.frequency.setValueAtTime(800, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+        }
+        gain.gain.setValueAtTime(0.2 * this.volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + (type === 'off' ? 0.2 : 0.12));
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      }
+      startMusic() {
+        this.init();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        this.isPlaying = true;
+        this.step = 0;
+        if (this.timer) clearInterval(this.timer);
+        this.timer = setInterval(() => {
+          if (!this.isPlaying || !this.ctx) return;
+          const now = this.ctx.currentTime;
+          // Kick Drum
+          if (this.step % 4 === 0) {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.frequency.setValueAtTime(140, now);
+            osc.frequency.exponentialRampToValueAtTime(38, now + 0.12);
+            g.gain.setValueAtTime(0.7, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            osc.connect(g);
+            g.connect(this.masterGain);
+            osc.start(now);
+            osc.stop(now + 0.15);
+          }
+          // Synth Bass
+          if (this.step % 2 === 0) {
+            const notes = [110, 130.81, 146.83, 164.81];
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(notes[Math.floor(this.step / 4) % notes.length], now);
+            g.gain.setValueAtTime(0.25, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            osc.connect(g);
+            g.connect(this.masterGain);
+            osc.start(now);
+            osc.stop(now + 0.18);
+          }
+          this.step = (this.step + 1) % 32;
+        }, 135);
+      }
+      stopMusic() {
+        this.isPlaying = false;
+        if (this.timer) { clearInterval(this.timer); this.timer = null; }
+      }
+      speakDJLivi(text) {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'es-ES';
+        u.pitch = 1.05;
+        u.volume = this.volume;
+        window.speechSynthesis.speak(u);
+      }
+    }
+    const audio = new AudioEngine();
+
+    // -----------------------------------------------------------------
+    // 2. ESTADO GENERAL
+    // -----------------------------------------------------------------
+    const state = {
+      isPoweredOn: false,
+      isPlaying: false,
+      volume: 0.7, // 70%
+      trackTitle: "Livi's Chill Beats (ESP32 Mix)",
+      trackArtist: "Spotify AI DJ • Electronic Waves",
+      djStatus: "¡Hola! Soy DJ Livi. Enciende el dispositivo para comenzar.",
+      trackProgress: 0.35,
+      trackDuration: 195, // 3:15
+      volHudTimer: 0
+    };
+
+    // -----------------------------------------------------------------
+    // 3. ESCENA THREE.JS
+    // -----------------------------------------------------------------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07090e);
+    scene.fog = new THREE.FogExp2(0x07090e, 0.04);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 4.2, 6.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.enabled = true;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.target.set(0, 0.8, 0);
+
+    // Luces
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfff5e6, 2.2);
+    dirLight.position.set(5, 8, 5);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    const rimLight = new THREE.PointLight(0x1db954, 2.8, 10);
+    rimLight.position.set(0, 3, -4);
+    scene.add(rimLight);
+
+    const cyanLight = new THREE.PointLight(0x00d2ff, 1.5, 8);
+    cyanLight.position.set(3, 1, 2);
+    scene.add(cyanLight);
+
+    // Suelo
+    const grid = new THREE.GridHelper(24, 24, 0x1db954, 0x1f2633);
+    grid.position.y = -0.01;
+    scene.add(grid);
+
+    // -----------------------------------------------------------------
+    // 4. TEXTURA DINÁMICA DE PANTALLA OLED (Canvas 2D -> 3D Mesh)
+    // -----------------------------------------------------------------
+    const screenCanvas = document.getElementById('screen-canvas');
+    const screenCtx = screenCanvas.getContext('2d');
+    const screenTexture = new THREE.CanvasTexture(screenCanvas);
+
+    function updateOledScreen(time, delta, freqData) {
+      const w = screenCanvas.width;
+      const h = screenCanvas.height;
+      const ctx = screenCtx;
+
+      ctx.fillStyle = '#06080c';
+      ctx.fillRect(0, 0, w, h);
+
+      if (!state.isPoweredOn) {
+        ctx.fillStyle = '#11151a';
+        ctx.fillRect(0, h / 2 - 1, w, 2);
+        screenTexture.needsUpdate = true;
+        return;
+      }
+
+      // 1. Header Bar
+      ctx.fillStyle = '#0e121a';
+      ctx.fillRect(0, 0, w, 32);
+
+      ctx.fillStyle = '#1db954';
+      ctx.beginPath();
+      ctx.arc(18, 16, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('SPOTIFY CONNECT • ESP32', 32, 20);
+
+      ctx.fillStyle = '#9d4edd';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✦ DJ LIVI AI', w / 2, 20);
+
+      const volPct = Math.round(state.volume * 100);
+      ctx.fillStyle = '#00d2ff';
+      ctx.textAlign = 'right';
+      ctx.fillText(`VOL: ${volPct}%`, w - 16, 20);
+      ctx.textAlign = 'left';
+
+      // 2. Zona DJ Livi (Izquierda)
+      const leftW = 150;
+      ctx.fillStyle = '#090d14';
+      ctx.fillRect(10, 40, leftW, h - 50);
+      ctx.strokeStyle = 'rgba(0, 210, 255, 0.25)';
+      ctx.strokeRect(10, 40, leftW, h - 50);
+
+      const avatarX = 38;
+      const avatarY = 70;
+      const pulse = Math.sin(time * 4) * 3;
+
+      ctx.fillStyle = 'rgba(0, 210, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(avatarX, avatarY, 20 + pulse, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#00d2ff';
+      ctx.beginPath();
+      ctx.arc(avatarX, avatarY, 15, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('DJ Livi', 62, 68);
+
+      ctx.fillStyle = '#1db954';
+      ctx.font = '9px monospace';
+      ctx.fillText('EN VIVO', 62, 80);
+
+      ctx.fillStyle = '#8e9bb0';
+      ctx.font = 'italic 10px sans-serif';
+      ctx.fillText(state.djStatus.substring(0, 32) + '...', 16, 110);
+
+      // 3. Zona Canción en Reproducción (Derecha)
+      const rightX = 175;
+      const rightW = w - rightX - 14;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText(state.trackTitle, rightX, 60);
+
+      ctx.fillStyle = '#1db954';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(state.trackArtist, rightX, 78);
+
+      ctx.fillStyle = state.isPlaying ? '#00ff66' : '#ffaa00';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(state.isPlaying ? '▶ REPRODUCIENDO' : '⏸ EN PAUSA', rightX, 98);
+
+      // Barra de progreso de la pista
+      if (state.isPlaying) {
+        state.trackProgress = (state.trackProgress + (delta * 0.02)) % 1.0;
+      }
+      ctx.fillStyle = '#1b222d';
+      ctx.fillRect(rightX, 106, rightW, 4);
+
+      ctx.fillStyle = '#1db954';
+      ctx.fillRect(rightX, 106, rightW * state.trackProgress, 4);
+
+      // 4. Ecualizador de Audio FFT en la pantalla
+      const numBars = 20;
+      const barWidth = Math.floor(rightW / numBars) - 2;
+      for (let i = 0; i < numBars; i++) {
+        let val = 0.08;
+        if (state.isPlaying && freqData) {
+          val = Math.max(0.08, (freqData[i % freqData.length] || 0) / 255);
+        } else if (state.isPlaying) {
+          val = 0.2 + Math.sin(time * 6 + i * 0.5) * 0.2;
+        }
+
+        const barH = val * 75;
+        const bx = rightX + i * (barWidth + 2);
+        const by = (h - 20) - barH;
+
+        const grad = ctx.createLinearGradient(0, by, 0, h - 20);
+        grad.addColorStop(0, '#00d2ff');
+        grad.addColorStop(0.5, '#1db954');
+        grad.addColorStop(1, '#0c4420');
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(bx, by, barWidth, barH);
+      }
+
+      // 5. HUD de Volumen al rotar la perilla
+      if (state.volHudTimer > 0) {
+        state.volHudTimer -= delta;
+        ctx.fillStyle = 'rgba(6, 10, 16, 0.94)';
+        ctx.fillRect(w / 2 - 100, h / 2 - 30, 200, 60);
+        ctx.strokeStyle = '#00d2ff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(w / 2 - 100, h / 2 - 30, 200, 60);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`VOLUMEN: ${volPct}%`, w / 2, h / 2 - 8);
+
+        ctx.fillStyle = '#1a222e';
+        ctx.fillRect(w / 2 - 70, h / 2 + 8, 140, 8);
+        ctx.fillStyle = '#00d2ff';
+        ctx.fillRect(w / 2 - 70, h / 2 + 8, 140 * state.volume, 8);
+        ctx.textAlign = 'left';
+      }
+
+      screenTexture.needsUpdate = true;
+    }
+
+    // -----------------------------------------------------------------
+    // 5. MODELO 3D (PROCEDURAL & BLENDER LOADER)
+    // -----------------------------------------------------------------
+    let modelGroup = new THREE.Group();
+    scene.add(modelGroup);
+
+    const meshes = { powerBtn: null, volumeKnob: null, playBtn: null, screen: null, ledRing: null };
+
+    // Dispositivo Procedural
+    function buildDevice() {
+      modelGroup.clear();
+
+      const bodyGeo = new THREE.BoxGeometry(5.2, 1.2, 3.4);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x181a1f, roughness: 0.35, metalness: 0.25 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.6;
+      body.castShadow = true;
+      modelGroup.add(body);
+
+      // Pantalla OLED
+      const screenGeo = new THREE.PlaneGeometry(2.4, 1.4);
+      const screenMat = new THREE.MeshBasicMaterial({ map: screenTexture, toneMapped: false });
+      const screen = new THREE.Mesh(screenGeo, screenMat);
+      screen.rotation.x = -Math.PI / 2;
+      screen.position.set(-0.8, 1.21, -0.4);
+      screen.name = "Screen";
+      modelGroup.add(screen);
+      meshes.screen = screen;
+
+      // Botón 1: Power
+      const btnPowerGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.25, 32);
+      const btnPowerMat = new THREE.MeshStandardMaterial({ color: 0x22262c, metalness: 0.4 });
+      const btnPower = new THREE.Mesh(btnPowerGeo, btnPowerMat);
+      btnPower.position.set(-1.8, 1.25, 0.85);
+      btnPower.name = "Btn_Power";
+      btnPower.userData = { role: 'power', originalY: 1.25 };
+      modelGroup.add(btnPower);
+      meshes.powerBtn = btnPower;
+
+      // Botón 2: Perilla de Volumen Giratoria
+      const btnVolGeo = new THREE.CylinderGeometry(0.42, 0.44, 0.38, 32);
+      const btnVolMat = new THREE.MeshStandardMaterial({ color: 0x2a2e36, metalness: 0.7, roughness: 0.2 });
+      const btnVol = new THREE.Mesh(btnVolGeo, btnVolMat);
+      btnVol.position.set(-0.6, 1.30, 0.85);
+      btnVol.name = "Btn_Volume";
+      btnVol.userData = { role: 'volume', isKnob: true };
+
+      // Puntero indicador de la perilla
+      const pointerGeo = new THREE.BoxGeometry(0.04, 0.08, 0.38);
+      const pointerMat = new THREE.MeshStandardMaterial({ color: 0x1db954, emissive: 0x1db954, emissiveIntensity: 0.8 });
+      const pointer = new THREE.Mesh(pointerGeo, pointerMat);
+      pointer.position.set(0, 0.17, -0.12);
+      btnVol.add(pointer);
+
+      modelGroup.add(btnVol);
+      meshes.volumeKnob = btnVol;
+
+      // Botón 3: Play / Pausa
+      const btnPlayGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.25, 32);
+      const btnPlayMat = new THREE.MeshStandardMaterial({ color: 0x1db954, emissive: 0x1db954, emissiveIntensity: 0.3 });
+      const btnPlay = new THREE.Mesh(btnPlayGeo, btnPlayMat);
+      btnPlay.position.set(0.6, 1.25, 0.85);
+      btnPlay.name = "Btn_PlayPause";
+      btnPlay.userData = { role: 'play', originalY: 1.25 };
+      modelGroup.add(btnPlay);
+      meshes.playBtn = btnPlay;
+
+      // Anillo LED
+      const ledGeo = new THREE.TorusGeometry(2.3, 0.04, 16, 64);
+      ledGeo.scale(1, 0.7, 1);
+      const ledMat = new THREE.MeshStandardMaterial({ color: 0x1db954, emissive: 0x1db954, emissiveIntensity: 0.4 });
+      const ledRing = new THREE.Mesh(ledGeo, ledMat);
+      ledRing.rotation.x = Math.PI / 2;
+      ledRing.position.y = 0.12;
+      modelGroup.add(ledRing);
+      meshes.ledRing = ledRing;
+
+      updateKnobAngle();
+    }
+
+    // -----------------------------------------------------------------
+    // CARGADOR Y MAPEO DE MODELO GLTF / GLB (BLENDER)
+    // -----------------------------------------------------------------
+    const glbLoader = new GLTFLoader();
+
+    function setupModelFromGltf(gltf, displayName = "Modelo 3D") {
+      modelGroup.clear();
+      const model = gltf.scene;
+
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = maxDim > 0 ? (4.8 / maxDim) : 1;
+
+      model.scale.set(scale, scale, scale);
+      model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+      modelGroup.add(model);
+
+      // Limpiar referencias anteriores
+      meshes.powerBtn = null;
+      meshes.volumeKnob = null;
+      meshes.playBtn = null;
+      meshes.screen = null;
+      meshes.ledRing = null;
+
+      const detected = [];
+      model.traverse((child) => {
+        if (child.isMesh) {
+          detected.push(child.name || 'Mesh');
+          const name = (child.name || '').toLowerCase();
+          
+          if (name.includes('power') || name.includes('btn1') || name.includes('boton1') || name.includes('encender')) {
+            meshes.powerBtn = child;
+            child.userData = { role: 'power', originalY: child.position.y };
+          } else if (name.includes('vol') || name.includes('knob') || name.includes('btn2') || name.includes('boton2') || name.includes('perilla') || name.includes('dial')) {
+            meshes.volumeKnob = child;
+            child.userData = { role: 'volume', isKnob: true };
+          } else if (name.includes('play') || name.includes('btn3') || name.includes('boton3') || name.includes('reproducir')) {
+            meshes.playBtn = child;
+            child.userData = { role: 'play', originalY: child.position.y };
+          } else if (name.includes('screen') || name.includes('display') || name.includes('oled') || name.includes('pantalla')) {
+            meshes.screen = child;
+            child.material = new THREE.MeshBasicMaterial({ map: screenTexture, toneMapped: false });
+          } else if (name.includes('led') || name.includes('ring') || name.includes('anillo')) {
+            meshes.ledRing = child;
+            child.material = new THREE.MeshStandardMaterial({ color: 0x1db954, emissive: 0x1db954, emissiveIntensity: 0.4 });
+          }
+        }
+      });
+
+      // Si no encontró pantalla por nombre exacto, buscar malla adecuada
+      if (!meshes.screen) {
+        model.traverse((child) => {
+          if (child.isMesh && !meshes.screen && child !== meshes.powerBtn && child !== meshes.volumeKnob && child !== meshes.playBtn) {
+            const name = (child.name || '').toLowerCase();
+            if (name.includes('front') || name.includes('top') || name.includes('face') || name.includes('panel') || name.includes('cube')) {
+              meshes.screen = child;
+              child.material = new THREE.MeshBasicMaterial({ map: screenTexture, toneMapped: false });
+            }
+          }
+        });
+      }
+
+      updateKnobAngle();
+      logESP32(`[BLENDER] "${displayName}" cargado (${detected.length} componentes).`);
+    }
+
+    function loadGlbFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        glbLoader.parse(e.target.result, '', (gltf) => {
+          setupModelFromGltf(gltf, file.name);
+        }, (err) => {
+          logESP32(`[ERROR BLENDER] ${err.message}`);
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function autoLoadDefaultModel() {
+      const pathsToTry = ['./certamen_fabricacion_digital.glb', './model.glb', './certamen%20%20fabricacion%20digital.glb'];
+      let idx = 0;
+
+      function tryNext() {
+        if (idx >= pathsToTry.length) {
+          logESP32("[3D] Usando dispositivo interactivo procedural predeterminado.");
+          buildDevice();
+          return;
+        }
+        const currentPath = pathsToTry[idx++];
+        glbLoader.load(
+          currentPath,
+          (gltf) => {
+            setupModelFromGltf(gltf, "Certamen Fabricación Digital 3D");
+            logESP32("[AUTO] ¡Modelo 3D del Certamen cargado correctamente!");
+          },
+          undefined,
+          () => {
+            tryNext();
+          }
+        );
+      }
+      tryNext();
+    }
+
+    // Iniciar con carga automática del modelo GLB del Certamen (o fallback procedural)
+    autoLoadDefaultModel();
+
+    // Botones de Selector de Modelo
+    document.getElementById('btn-load-certamen').addEventListener('click', () => {
+      autoLoadDefaultModel();
+    });
+
+    document.getElementById('btn-load-procedural').addEventListener('click', () => {
+      buildDevice();
+      logESP32("[3D] Cambiado a Modelo Procedural ESP32.");
+    });
+
+    // Eventos Drag & Drop de Blender
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('glb-file-input');
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) loadGlbFile(e.target.files[0]); });
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer.files.length > 0) loadGlbFile(e.dataTransfer.files[0]);
+    });
+
+    // -----------------------------------------------------------------
+    // 6. PERILLA DE VOLUMEN (Giro Derecha = Vol+, Giro Izquierda = Vol-)
+    // -----------------------------------------------------------------
+    function setDeviceVolume(val, feedback = true) {
+      state.volume = Math.max(0.0, Math.min(1.0, val));
+      audio.setVolume(state.volume);
+      if (feedback) audio.playClick('click');
+
+      const pct = Math.round(state.volume * 100);
+      document.getElementById('hud-vol-slider').value = pct;
+      document.getElementById('hud-vol-text').innerText = `${pct}%`;
+
+      updateKnobAngle();
+      state.volHudTimer = 2.5; // Muestra HUD de volumen en la pantalla OLED
+
+      const deg = Math.round((-135 + state.volume * 270));
+      document.getElementById('status-vol').innerText = `Volumen: ${pct}% (Ángulo: ${deg}°)`;
+      logESP32(`[ESP32] Perilla de volumen -> ${pct}% (GPIO 19)`);
+    }
+
+    function rotateKnobStep(dir) {
+      if (!state.isPoweredOn) return;
+      // dir = +1 (derecha / subir) | -1 (izquierda / bajar)
+      setDeviceVolume(state.volume + dir * 0.05);
+    }
+
+    function updateKnobAngle() {
+      if (!meshes.volumeKnob) return;
+      // Ángulo de -135° (-2.35 rad) a +135° (+2.35 rad)
+      const minAngle = -2.356;
+      const maxAngle = 2.356;
+      meshes.volumeKnob.rotation.y = minAngle + state.volume * (maxAngle - minAngle);
+    }
+
+    // -----------------------------------------------------------------
+    // 7. ACCIONES DE LOS BOTONES
+    // -----------------------------------------------------------------
+    function triggerPower() {
+      state.isPoweredOn = !state.isPoweredOn;
+      audio.playClick(state.isPoweredOn ? 'on' : 'off');
+
+      document.getElementById('status-dot').className = `status-dot ${state.isPoweredOn ? 'on' : ''}`;
+      document.getElementById('status-label').innerText = `Dispositivo: ${state.isPoweredOn ? 'ENCENDIDO' : 'APAGADO'}`;
+
+      if (state.isPoweredOn) {
+        state.djStatus = "¡Hola! Soy DJ Livi de Spotify. Dispositivo ESP32 listo.";
+        audio.speakDJLivi("¡Hola! Soy DJ Livi de Spotify.");
+        logESP32("[ESP32] Dispositivo ENCENDIDO (GPIO 18 HIGH)");
+      } else {
+        if (state.isPlaying) triggerPlay(false);
+        state.djStatus = "Dispositivo apagado. Presiona Botón 1.";
+        logESP32("[ESP32] Dispositivo APAGADO (GPIO 18 LOW)");
+      }
+
+      if (meshes.powerBtn) animatePress(meshes.powerBtn);
+    }
+
+    function triggerPlay(forceState = null) {
+      if (!state.isPoweredOn) return;
+      state.isPlaying = (forceState !== null) ? forceState : !state.isPlaying;
+      audio.playClick('click');
+
+      if (state.isPlaying) {
+        audio.startMusic();
+        document.getElementById('hud-btn-play').innerHTML = '<i class="fa-solid fa-pause"></i>';
+        state.djStatus = "Reproduciendo selección de DJ Livi...";
+        logESP32("[ESP32] Música REPRODUCIENDO (GPIO 23 HIGH)");
+      } else {
+        audio.stopMusic();
+        document.getElementById('hud-btn-play').innerHTML = '<i class="fa-solid fa-play"></i>';
+        state.djStatus = "Música en pausa. Presiona Play.";
+        logESP32("[ESP32] Música PAUSADA (GPIO 23 LOW)");
+      }
+
+      if (meshes.playBtn) animatePress(meshes.playBtn);
+    }
+
+    function animatePress(mesh) {
+      const origY = mesh.userData.originalY || mesh.position.y;
+      mesh.position.y = origY - 0.08;
+      setTimeout(() => { mesh.position.y = origY; }, 150);
+    }
+
+    function logESP32(msg) {
+      const term = document.getElementById('esp-terminal');
+      const div = document.createElement('div');
+      div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // -----------------------------------------------------------------
+    // 8. INTERACCIÓN POR RATÓN & RAYCASTING
+    // -----------------------------------------------------------------
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let isDraggingKnob = false;
+    let dragStartX = 0;
+    let dragStartVol = 0.7;
+
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.ui-overlay')) return;
+
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const targets = [meshes.powerBtn, meshes.volumeKnob, meshes.playBtn].filter(Boolean);
+      const hits = raycaster.intersectObjects(targets, true);
+
+      if (hits.length > 0) {
+        let obj = hits[0].object;
+        while (obj && !obj.userData.role && obj.parent) obj = obj.parent;
+
+        if (obj.userData.role === 'power') {
+          triggerPower();
+        } else if (obj.userData.role === 'volume' || obj.userData.isKnob) {
+          // Iniciar arrastre de la perilla de volumen
+          isDraggingKnob = true;
+          dragStartX = e.clientX;
+          dragStartVol = state.volume;
+          controls.enabled = false;
+        } else if (obj.userData.role === 'play') {
+          triggerPlay();
+        }
+      }
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (isDraggingKnob) {
+        // Arrastrar a la derecha -> Sube volumen (+)
+        // Arrastrar a la izquierda -> Baja volumen (-)
+        const deltaX = e.clientX - dragStartX;
+        setDeviceVolume(dragStartVol + deltaX * 0.005, false);
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      if (isDraggingKnob) {
+        isDraggingKnob = false;
+        controls.enabled = true;
+        audio.playClick('click');
+      }
+    });
+
+    // Rueda del ratón sobre la perilla de volumen
+    window.addEventListener('wheel', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      if (meshes.volumeKnob && raycaster.intersectObject(meshes.volumeKnob, true).length > 0) {
+        e.preventDefault();
+        const dir = e.deltaY < 0 ? 1 : -1; // Rueda arriba = derecha (+), Rueda abajo = izquierda (-)
+        rotateKnobStep(dir);
+      }
+    }, { passive: false });
+
+    // UI HUD Controls
+    document.getElementById('hud-btn-play').addEventListener('click', () => triggerPlay());
+    document.getElementById('hud-btn-prev').addEventListener('click', () => {
+      state.trackTitle = "Midnight Synthwave Chill";
+      document.getElementById('hud-track-title').innerText = state.trackTitle;
+      logESP32("[SPOTIFY] Pista anterior seleccionada.");
+    });
+    document.getElementById('hud-btn-next').addEventListener('click', () => {
+      state.trackTitle = "Electronic Horizons (Live)";
+      document.getElementById('hud-track-title').innerText = state.trackTitle;
+      state.djStatus = "Subiendo el ritmo con esta nueva pista seleccionada.";
+      audio.speakDJLivi(state.djStatus);
+      logESP32("[SPOTIFY] Siguiente pista seleccionada.");
+    });
+    document.getElementById('hud-btn-voice').addEventListener('click', () => {
+      if (!state.isPoweredOn) return;
+      state.djStatus = "¡Excelente elección! Sintonizando tus favoritos en tu ESP32.";
+      audio.speakDJLivi(state.djStatus);
+    });
+    document.getElementById('hud-vol-slider').addEventListener('input', (e) => {
+      setDeviceVolume(parseFloat(e.target.value) / 100);
+    });
+
+    // -----------------------------------------------------------------
+    // 9. CONEXIÓN WEB SERIAL API (ESP32 FÍSICO REAL)
+    // -----------------------------------------------------------------
+    document.getElementById('btn-connect-esp32').addEventListener('click', async () => {
+      if (!('serial' in navigator)) {
+        alert("Tu navegador no soporta Web Serial. Usa Google Chrome o Edge.");
+        return;
+      }
+      try {
+        const port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+        logESP32("[SERIAL] ¡ESP32 físico conectado a 115200 baudios!");
+
+        const textDecoder = new TextDecoderStream();
+        port.readable.pipeTo(textDecoder.writable);
+        const reader = textDecoder.readable.getReader();
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) {
+            if (value.includes("BTN_POWER")) triggerPower();
+            else if (value.includes("BTN_VOL_UP")) rotateKnobStep(1);
+            else if (value.includes("BTN_VOL_DOWN")) rotateKnobStep(-1);
+            else if (value.includes("BTN_PLAY")) triggerPlay();
+          }
+        }
+      } catch (err) {
+        logESP32(`[SERIAL ERROR] ${err.message}`);
+      }
+    });
+
+    // -----------------------------------------------------------------
+    // 10. BUCLE DE RENDERIZADO (60 FPS)
+    // -----------------------------------------------------------------
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const time = clock.getElapsedTime();
+      const freqData = audio.getFrequencies();
+
+      // Pulsar anillo LED al ritmo de la música
+      if (meshes.ledRing && meshes.ledRing.material) {
+        if (state.isPoweredOn && state.isPlaying) {
+          const energy = freqData ? (freqData[2] / 255) : 0.5;
+          meshes.ledRing.material.emissiveIntensity = 0.5 + energy * 1.5;
+        } else if (state.isPoweredOn) {
+          meshes.ledRing.material.emissiveIntensity = 0.3;
+        } else {
+          meshes.ledRing.material.emissiveIntensity = 0.0;
+        }
+      }
+
+      updateOledScreen(time, delta, freqData);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
